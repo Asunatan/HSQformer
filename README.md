@@ -1,2 +1,2 @@
-# LiverNet
-![image]((https://github.com/Asunatan/LiverNet/fig2.png)
+# HSQformer
+The paper is being published, please stay tuned
