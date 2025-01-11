@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0ef26c6c-1dd6-4ca4-9251-d648ab166700" name="Changes" comment="1" />
+    <list default="true" id="0ef26c6c-1dd6-4ca4-9251-d648ab166700" name="Changes" comment="Upload the code" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -68,7 +68,7 @@
       <option name="presentableId" value="Default" />
       <updated>1736585187177</updated>
       <workItem from="1736585189129" duration="785000" />
-      <workItem from="1736585983985" duration="498000" />
+      <workItem from="1736585983985" duration="800000" />
     </task>
     <task id="LOCAL-00001" summary="1">
       <option name="closed" value="true" />
@@ -126,7 +126,15 @@
       <option name="project" value="LOCAL" />
       <updated>1736586131696</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Upload the code">
+      <option name="closed" value="true" />
+      <created>1736586585046</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1736586585046</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -146,6 +154,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Merge remote-tracking branch 'origin/main'&#10;&#10;# Conflicts:&#10;#&#9;.idea/misc.xml" />
     <MESSAGE value="1" />
-    <option name="LAST_COMMIT_MESSAGE" value="1" />
+    <MESSAGE value="Upload the code" />
+    <option name="LAST_COMMIT_MESSAGE" value="Upload the code" />
   </component>
 </project>
