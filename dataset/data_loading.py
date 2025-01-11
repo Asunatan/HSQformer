@@ -176,17 +176,14 @@ class Liver_Dataset(Dataset):
         self.path_df = path_df
 
         self.mode = mode
-        # self.val_tranforms = A.Compose([
-        #     A.Resize(224, 224),
-        #     A.Normalize(),
-        #     ToTensorV2()])
+
         if mode=='val' or mode=='test':
             self.transforms =  v2.Compose([
                 v2.ToImage(),
                 v2.Resize((224,224),interpolation=InterpolationMode.BILINEAR),
                 v2.ToDtype(torch.float32, scale=True),
-                # v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-                v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                # v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 ])
         else:
             self.transforms = v2.Compose([

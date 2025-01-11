@@ -5,13 +5,13 @@ import os
 
 from timm.utils import  ModelEmaV3
 
-from Decouple_liver.models.LivNet import LivNet_Baseline, LivNet_no_moe,  LENet
-from Decouple_liver.models.convnext_segmentaion import convnext_small,convnext_base
-from Decouple_liver.models.focalnet import focalnet_base_lrf
-from Decouple_liver.models.mpvit import mpvit_base
-from Decouple_liver.utils.loss import FocalLoss
+from models.LivNet import LivNet_Baseline, LivNet_no_moe,  LENet
+from models.convnext_segmentaion import convnext_small,convnext_base
+from models.focalnet import focalnet_base_lrf
+from models.mpvit import mpvit_base
+from utils.loss import FocalLoss
 
-from Decouple_liver.utils.train_eval import CAM_visualization, evaluate, train_one_epoch, metric_info, visual_feature
+from utils.train_eval import CAM_visualization, evaluate, train_one_epoch, metric_info, visual_feature
 from models.thynet import ThyNet
 from torchvision.models import swin_b, Swin_B_Weights, vit_b_16, ViT_B_16_Weights, swin_s, Swin_S_Weights
 from models.hiera_segmentation import Hiera
@@ -42,9 +42,7 @@ def main(rank, k_fold, args):
                              f'top_{args.top_k}',args.head_type,*(['cat_moe_head'] if args.cat_moe_head else []),
                              'q_former_depths'+'_'.join(str(i) for i in args.q_former_depths),f'num_query_{args.num_query_tokens}',
                              f'query_dim_{args.query_dim}'
-
                              ])
-        # model = LENet(args=args)
     else:
         args.model = args.model
     seed = args.seed + k_fold
@@ -55,69 +53,29 @@ def main(rank, k_fold, args):
     if args.k_fold:
         train_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/train_{}.csv'.format(k_fold))
         valid_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/val_{}.csv'.format(k_fold))
-        independent_val_df = pd.read_csv('/home/uax/SCY/Decouple_liver/dataset/multicenter_test.csv')#多中心
-        test_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/test.csv')
-        test3_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/test3.csv')
-        test7_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/test7.csv')#7院
-        # independent_test_df = pd.read_csv(r'/home/uax/SCY/LiverClassification/dataset/liver_external_independent_test_2classification.csv')
-        train_total_df = pd.concat([train_df,test7_df], axis=0)
-
-        valid_total_df = pd.concat([valid_df, independent_val_df], axis=0)
-
-        train_dataset = Liver_Dataset(train_total_df, 'train')
-        val_dataset = Liver_Dataset(valid_total_df, 'val')
-        test_dataset = Liver_Dataset(test_df, 'val')
-        test3_dataset = Liver_Dataset(test3_df, 'val')
-
+        multi_center_df = pd.read_csv('/home/uax/SCY/Decouple_liver/dataset/multicenter_test.csv')#multi-center
+        test_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/test.csv')#high-risk patient
+        test3_df = pd.read_csv(r'/home/uax/SCY/Decouple_liver/dataset/test3.csv')# single-center
+        train_dataset = Liver_Dataset(train_df, 'train')
+        val_dataset = Liver_Dataset(valid_df, 'val')
+        single_center_test_dataset = Liver_Dataset(test3_df, 'val')
+        multi_center_test_dataset = Liver_Dataset(multi_center_df, 'val')
+        high_risk_test_dataset = Liver_Dataset(test_df, 'val')
     else:
         raise Exception("Please use 5-fold cross validation")
 
-
-    # samples_per_class = np.bincount(train_df.labels)
-
-    ###不平衡类别加权方式1#####
-    # n_classes = len(class_count)
-    # weights = torch.tensor([sum(class_count) / (n_classes * class_count[i]) for i in range(n_classes)])
-    # weights = weights / torch.sum(weights)
-    ######不平衡类别加权方式2#####
-    # weights=torch.tensor(1.0/class_count,dtype=torch.float).to(rank)
-    # weights=weights / weights.sum()
-    #criterion = ClassBalancedLoss(class_count)
-    ##################方式3#########
-
-    criterion_focal=FocalLoss(alpha=0.25,gamma=2)
+    criterion_focal = FocalLoss(alpha=0.25,gamma=2)
     # criterion_focal = ClassBalancedLoss(samples_per_class=None, gamma=2, label_smoothing=args.smoothing,mixup=args.mixup)
     if args.criterion=='CrossEntropyLoss':
-        # criterion = torch.nn.CrossEntropyLoss(weight=torch.tensor([0.4,0.55]).to(rank))
         criterion = torch.nn.CrossEntropyLoss(label_smoothing=args.smoothing)
     else:
         raise Exception("Please replace it with cross entropy")
-    #数据不平衡采样器
-    # class_count = np.bincount(train_df['labels'])
-    # # 计算每个类别的权重
-    # class_weights = 1.0 / samples_per_class
-    # class_weights = class_weights / np.sum(class_weights)
-    #class_weights=np.array([0.4,0.6])
-    # 构建完整的权重向量
-    # beta=0.9999
-    # effective_num = 1.0 - np.power(beta, samples_per_class)
-    # class_weights = (1.0 - beta) / (np.array(effective_num) + float("1e-8"))
-    # constant_sum = len(samples_per_class)
-    # class_weights = (class_weights / np.sum(class_weights) * constant_sum).astype(np.float32)
-    #
-    # weights = []
-    # for i in range(len(class_weights)):
-    #     weights += [class_weights[i]] * samples_per_class[i]
-    # weights = np.array(weights)
+
     if args.weight_sampler:
-        class_count = np.bincount(train_total_df['labels'])
+        class_count = np.bincount(train_dataset['labels'])
         class_weights = 1.0 / class_count
-        # class_weights[1]=0.00026
-        #0.00012158,0.00031696    0.00012105,0.00032248  ,0.00012127,0.00031857  [0.00012044 0.00031807][0.00012085 0.00032415]
-
-        sample_weights = [class_weights[i] for i in train_total_df['labels'].values]
-
-        sampler = torch.utils.data.WeightedRandomSampler(weights=sample_weights,num_samples=int(2.3*len(train_dataset)))
+        sample_weights = [class_weights[i] for i in train_dataset['labels'].values]
+        sampler = torch.utils.data.WeightedRandomSampler(weights=sample_weights,num_samples=int(2*len(train_dataset)))
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False,sampler=sampler,
                                   num_workers=args.num_workers,pin_memory=True,drop_last=True)
     else:
@@ -125,29 +83,18 @@ def main(rank, k_fold, args):
                                   num_workers=args.num_workers,pin_memory=True,drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
                             pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
+    single_center_loader = DataLoader(single_center_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
                              pin_memory=True)
-    test3_loader = DataLoader(test3_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
+    multi_center_loader = DataLoader(multi_center_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
                              pin_memory=True)
-    # extra_test_loader = DataLoader(extra_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-    #                          pin_memory=True)
-    # test7_loader = DataLoader(test7_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-    #                          pin_memory=True)
-    # test3020_loader = DataLoader(test3020_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-    #                          pin_memory=True)
-    # independent_test_loader = DataLoader(independent_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-    #                          pin_memory=True)
-    # 实例化模型
-    '/home/uax/SCY/Decouple_liver'
-    if args.model == 'LivNet':
-        print('LivNet')
-        # model = LivNet(aux_loss=args.aux_loss)
-        pass
-    if args.model == 'LivNet_Baseline':
-        print('LivNet_Baseline')
+    high_risk_loader = DataLoader(high_risk_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
+                             pin_memory=True)
+
+    if args.model == 'HSQformer_Baseline':
+        print('HSQformer_Baseline')
         model = LivNet_Baseline()
-    if args.model == 'LivNet_no_moe':
-        print('LivNet_no_moe')
+    if args.model == 'HSQformer_no_moe':
+        print('HSQformer_Baseline')
         model = LivNet_no_moe(aux_loss=args.aux_loss)
 
     if 'LENet' in args.model:
@@ -180,7 +127,6 @@ def main(rank, k_fold, args):
         weight = torch.load(r'/home/uax/SCY/LiverClassification/Weights/focalnet_base_lrf.pth', map_location="cpu")['model']
         model.load_state_dict(weight)
         model.head = nn.Linear(in_features=model.head.in_features,out_features=args.num_classes)
-
     if args.model == 'Resnet':
         print('Resnet')
         model = resnet101(weights=ResNet101_Weights.IMAGENET1K_V1)
@@ -206,16 +152,11 @@ def main(rank, k_fold, args):
             out_features=args.num_classes)
     if args.model == 'Cswin':
         print('Cswin')
-        # url = "https://github.com/microsoft/CSWin-Transformer/releases/download/v0.1.0/cswin_large_224.pth"
-        # state_dict = model_zoo.load_url(url,'/home/uax/SCY/LiverClassification/Weights')
         model = cswin.CSWin_96_24322_base_224( drop_path_rate=0.0)
         pretrain_dict = torch.load('/home/uax/SCY/LiverClassification/Weights/cswin_base_224.pth')
         model.load_state_dict(pretrain_dict['state_dict_ema'])
-        # pretrain_dict=torch.load('/home/uax/SCY/LiverClassification/Contrastivebest.pth')
-        # model.load_state_dict(pretrain_dict['model_state_dict'])
         inchannel = model.head.in_features
         model.head = nn.Linear(in_features=inchannel, out_features=args.num_classes)
-
     if args.model == 'Convnext':
         print('Convnext')
         model = convnext_small(pretrained=False, in_22k=False,return_feature=False)
@@ -230,7 +171,6 @@ def main(rank, k_fold, args):
         model.load_state_dict(pretrain_dict['model'],strict=False)
         inchannel = model.head.in_features
         model.head = nn.Linear(in_features=inchannel, out_features=args.num_classes)
-
     if args.model == 'SwinTransformerV2':
         model = SwinTransformerV2(img_size=384, embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32],
                                   window_size=24, pretrained_window_sizes=[12, 12, 12, 6], drop_path_rate=0.2)
@@ -244,7 +184,6 @@ def main(rank, k_fold, args):
         model=swin_b(weights=Swin_B_Weights.IMAGENET1K_V1)
         inchannel = model.head.in_features
         model.head = nn.Linear(in_features=inchannel, out_features=args.num_classes)
-
     if args.model == 'SwinTransformer_S':
         print('SwinTransformer_S')
         model=swin_s(weights=Swin_S_Weights.IMAGENET1K_V1)
@@ -265,15 +204,10 @@ def main(rank, k_fold, args):
         Specificity(task=args.categories, num_classes=args.num_classes, average='macro'),
         F1Score(task=args.categories, num_classes=args.num_classes, average='macro'),
         AUROC(task=args.categories, num_classes=args.num_classes, average='macro',),
-        #ConfusionMatrix()#行是GT，列是预测
     ])
     if args.visual_feature:
-        #lenet '/home/uax/SCY/Decouple_liver/checkpoints/{}_val{}.pth'
-        #/media/uax/CA4E64EFA9C3DA83/HCC/convnext/Convnext_val0.pth
-        #/home/uax/SCY/Decouple_liver/checkpoints/SwinTransformer_S_val0.pth
         checkpoint = torch.load('/media/uax/CA4E64EFA9C3DA83/HCC/convnext/{}_val{}.pth'
         .format(args.model,k_fold),map_location='cpu')
-
         model.load_state_dict(checkpoint['state_dict'])
         visual_feature(model,metric_collection=metric_collection,device=rank, data_loader=val_loader)
     if args.cam_visualization:
@@ -281,44 +215,32 @@ def main(rank, k_fold, args):
         print('exit')
         exit()
     if args.test:
-        # model = liver_3_ablation_nostage0123_net(aux_loss=args.aux_loss).to(0)
-        # checkpoint = torch.load('/home/uax/SCY/Decouple_liver/checkpoints/{}_val{}.pth'
-        # .format(args.model,k_fold),map_location='cpu')
-        # checkpoint = torch.load('/media/uax/CA4E64EFA9C3DA83/HCC/ablation/LENet-serial-sparse_token-4experts-top_1-linear-q_former_depths2_2_6_2_val{}.pth'
-        # .format(k_fold),map_location='cpu')
         checkpoint = torch.load('/media/uax/CA4E64EFA9C3DA83/HCC/ablation/LENet-serial-sparse_token-4experts-top_1-linear-q_former_depths1_1_1_1_val{}.pth'
         .format(k_fold),map_location='cpu')
-
-
-
         model.load_state_dict(checkpoint['state_dict'])
         args.output_csv=f'{args.model}_multi'
-        test_loss = evaluate(model=model, data_loader=val_loader, criterion=criterion,
+        test_loss = evaluate(model=model, data_loader=single_center_loader, criterion=criterion,
                          metric_collection=metric_collection,device=rank,args=args,k_fold=k_fold)
         test_accuracy, test_precision, test_recall, test_specificity, test_f1, test_AUC = metric_collection.compute().values()
         print(
         " test_loss:{:.4f} test_accuracy:{:.4f} test_precision:{:.4f} test_recall:{:.4f} test_specificity:{:.4f} test_f1:{:.4f} test_AUC:{:.4f}" \
             .format(test_loss, test_accuracy, test_precision, test_recall,test_specificity, test_f1, test_AUC))
         args.output_csv = f'{args.model}_single'#写反了和high_risk，画图的时候注意
-        test_loss = evaluate(model=model, data_loader=test_loader, criterion=criterion,
+        test_loss = evaluate(model=model, data_loader=multi_center_loader, criterion=criterion,
                          metric_collection=metric_collection,device=rank,args=args,k_fold=k_fold)
         test_accuracy, test_precision, test_recall, test_specificity, test_f1, test_AUC = metric_collection.compute().values()
         print(
         " test_loss:{:.4f} test_accuracy:{:.4f} test_precision:{:.4f} test_recall:{:.4f} test_specificity:{:.4f} test_f1:{:.4f} test_AUC:{:.4f}" \
             .format(test_loss, test_accuracy, test_precision, test_recall,test_specificity, test_f1, test_AUC))
         args.output_csv = f'{args.model}_high_risk'
-        test_loss = evaluate(model=model, data_loader=test3_loader, criterion=criterion,
+        test_loss = evaluate(model=model, data_loader=high_risk_loader, criterion=criterion,
                          metric_collection=metric_collection,device=rank,args=args,k_fold=k_fold)
         test_accuracy, test_precision, test_recall, test_specificity, test_f1, test_AUC = metric_collection.compute().values()
         print(
         " test_loss:{:.4f} test_accuracy:{:.4f} test_precision:{:.4f} test_recall:{:.4f} test_specificity:{:.4f} test_f1:{:.4f} test_AUC:{:.4f}" \
             .format(test_loss, test_accuracy, test_precision, test_recall,test_specificity, test_f1, test_AUC))
-
         return
 
-
-    # model_ema = torch.optim.swa_utils.AveragedModel(model,
-    #     multi_avg_fn=torch.optim.swa_utils.get_ema_multi_avg_fn(0.999))
     if args.model_ema:
         model_ema = ModelEmaV3(model,decay=args.model_ema_decay,
                 use_warmup=args.model_ema_warmup,
@@ -374,12 +296,6 @@ def main(rank, k_fold, args):
     else:
         mixup_fn = None
 
-    # Scheduler
-    #scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=5, T_mult=2)
-    # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs,eta_min=1e-6)
-
-
-
     best_test_auc = 0.
     best_val_auc = 0.
     start_epoch = 0
@@ -391,21 +307,6 @@ def main(rank, k_fold, args):
                                 .format(args.model, k_fold), map_location='cpu')
 
         model.load_state_dict(checkpoint['state_dict'])
-        # start_epoch=checkpoint['epoch']+1
-        # scheduler.load_state_dict(checkpoint['lr_schedule'])
-        # optimizer.load_state_dict(checkpoint['optimizer'])
-
-        # model_dict = {}
-        # state_dict = model.state_dict()
-        # for k, v in checkpoint['state_dict'].items():
-        #     if k in state_dict and k!='classifier_weight':
-        #         model_dict[k] = v
-        # state_dict.update(model_dict)
-        # model.load_state_dict(state_dict)
-        # model.load_state_dict(checkpoint['state_dict'])
-        #model_ema.load_state_dict(checkpoint['state_dict_ema'])
-        # args.resume=False
-
 
     if args.test==False:
         os.makedirs(args.log_dir, exist_ok=True)
@@ -442,33 +343,35 @@ def main(rank, k_fold, args):
         train_loss = train_one_epoch(model, optimizer, metric_collection,num_updates=num_updates,epoch=epoch,scheduler=scheduler,criterion_focal=criterion_focal,
                                             mixup_fn=mixup_fn,data_loader=train_loader, device=rank,ema_updata_epoch=args.ema_updata_epoch,
                                             criterion=criterion,scaler=scaler,aux_loss=args.aux_loss,model_ema=model_ema)
-        # scheduler.step()
-        # torch.optim.swa_utils.update_bn(train_loader, model_ema)
         train_metric=metric_info(metric_collection)
         logger.info(f"Train: loss:{train_loss:.4f}, {train_metric}")
         if epoch>args.ema_updata_epoch:
-            num_updates += 1
-            model_ema.update(model, step=num_updates)
-            val_loss = evaluate(model=model_ema, data_loader=val_loader, criterion=criterion,
+            val_loss = evaluate(model=model, data_loader=val_loader, criterion=criterion,
                                  metric_collection=metric_collection,device=rank,args=args)
             val_metric=metric_info(metric_collection)
             logger.info(f"Val: loss:{val_loss:.4f}, {val_metric}")
 
-            test_loss = evaluate(model=model_ema, data_loader=test_loader, criterion=criterion,
+            test_loss = evaluate(model=model, data_loader=single_center_loader, criterion=criterion,
                                  metric_collection=metric_collection,device=rank,args=args)
             test_metric=metric_info(metric_collection)
-            logger.info(f"Test: loss:{test_loss:.4f}, {test_metric}")
+            logger.info(f"Single_center_test: loss:{test_loss:.4f}, {test_metric}")
 
-            test3_loss = evaluate(model=model_ema, data_loader=test3_loader, criterion=criterion,
+            test_loss = evaluate(model=model, data_loader=multi_center_loader, criterion=criterion,
                                  metric_collection=metric_collection,device=rank,args=args)
-            test3_metric=metric_info(metric_collection)
-            logger.info(f"Test 3: loss:{test3_loss:.4f}, {test3_metric}")
+            test_metric=metric_info(metric_collection)
+            logger.info(f"Multi_center_test: loss:{test_loss:.4f}, {test_metric}")
+
+            test_loss = evaluate(model=model, data_loader=high_risk_loader, criterion=criterion,
+                                 metric_collection=metric_collection,device=rank,args=args)
+            test_metric=metric_info(metric_collection)
+            logger.info(f"High_risk_test 3: loss:{test_loss:.4f}, {test_metric}")
             if val_metric['AUROC'] > best_val_auc:
                 best_val_auc = val_metric['AUROC']
+                num_updates += 1
+                model_ema.update(model, step=num_updates)
                 checkpoint = {
                     'epoch': epoch,
                     'state_dict': model.state_dict(),
-                    # 'state_dict_ema': model_ema.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_schedule': scheduler.state_dict()}
                 torch.save(checkpoint, os.path.join(args.checkpoints,
@@ -477,7 +380,6 @@ def main(rank, k_fold, args):
                 checkpoint = {
                     'epoch': epoch,
                     'state_dict': model_ema.module.state_dict(),
-                    # 'state_dict_ema': model_ema.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_schedule': scheduler.state_dict()}
                 torch.save(checkpoint, os.path.join(args.checkpoints,
@@ -489,46 +391,30 @@ def main(rank, k_fold, args):
             val_metric = metric_info(metric_collection)
             logger.info(f"Val: loss:{val_loss:.4f}, {val_metric}")
 
-            test_loss = evaluate(model=model, data_loader=test_loader, criterion=criterion,
-                                 metric_collection=metric_collection, device=rank,args=args)
-            test_metric = metric_info(metric_collection)
-            logger.info(f"Test: loss:{test_loss:.4f}, {test_metric}")
+            test_loss = evaluate(model=model, data_loader=single_center_loader, criterion=criterion,
+                                 metric_collection=metric_collection,device=rank,args=args)
+            test_metric=metric_info(metric_collection)
+            logger.info(f"Single_center_test: loss:{test_loss:.4f}, {test_metric}")
 
-            test3_loss = evaluate(model=model, data_loader=test3_loader, criterion=criterion,
-                                  metric_collection=metric_collection, device=rank,args=args)
-            test3_metric = metric_info(metric_collection)
-            logger.info(f"Test 3: loss:{test3_loss:.4f}, {test3_metric}")
+            test_loss = evaluate(model=model, data_loader=multi_center_loader, criterion=criterion,
+                                 metric_collection=metric_collection,device=rank,args=args)
+            test_metric=metric_info(metric_collection)
+            logger.info(f"Multi_center_test: loss:{test_loss:.4f}, {test_metric}")
 
-        # scheduler.step()
-        #     checkpoint = {
-        #         'epoch': epoch,
-        #         'state_dict': model_ema.module.state_dict(),
-        #         #'state_dict_ema': model_ema.state_dict(),
-        #         'optimizer': optimizer.state_dict(),
-        #         'lr_schedule': scheduler.state_dict()}
-        #
-        #     torch.save(checkpoint, os.path.join(args.checkpoints,
-        #                                         args.model + '_checkpoint{}.pth'.format(k_fold)))
+            test_loss = evaluate(model=model, data_loader=high_risk_loader, criterion=criterion,
+                                 metric_collection=metric_collection,device=rank,args=args)
+            test_metric=metric_info(metric_collection)
+            logger.info(f"High_risk_test 3: loss:{test_loss:.4f}, {test_metric}")
+
             if val_metric['AUROC'] > best_val_auc:
                 best_val_auc = val_metric['AUROC']
                 checkpoint = {
                     'epoch': epoch,
                     'state_dict': model.state_dict(),
-                    # 'state_dict_ema': model_ema.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_schedule': scheduler.state_dict()}
                 torch.save(checkpoint, os.path.join(args.checkpoints,
                                                 args.model + '_val{}.pth'.format(k_fold)))
-        # if test_metric['AUROC'] >= best_test_auc:
-        #     best_test_auc = test_metric['AUROC']
-        #     checkpoint = {
-        #         'epoch': epoch,
-        #         'state_dict': model.state_dict(),
-        #         #'state_dict_ema': model_ema.state_dict(),
-        #         'optimizer': optimizer.state_dict(),
-        #         'lr_schedule': scheduler.state_dict()}
-        #     torch.save(checkpoint, os.path.join(args.checkpoints,
-        #                                     args.model + '_test{}.pth'.format(k_fold)))
 
 
 
@@ -609,17 +495,6 @@ if __name__ == '__main__':
     choices=[96,192,384,768])
 
     args = parser.parse_args()
-
-    # print('DDP is available -> {}'.format(torch.distributed.is_available()))
-    # world_size = torch.cuda.device_count()
-    #
-    # if arg.distributed is True:
-    #     mp.spawn(main_distributed, args=(world_size, arg), nprocs=world_size)  # DDP分布式训练
-    # else:
-    # pre=torch.tensor([1]*2884)
-    # gt=torch.tensor([0]*706+[1]*2178)
-    # auroc=AUROC(task='binary', num_classes=2, average='macro', )
-    # a=auroc(pre,gt)
 
     if args.k_fold:
         k_fold=5

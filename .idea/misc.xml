@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12" project-jdk-type="Python SDK" />
+  <component name="Black">
+    <option name="sdkName" value="Remote Python 3.12.7 (sftp://scy@10.168.80.146:22/data2/scy/anaconda3/envs/pytorch_2.5.1/bin/python)" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.11.9 (sftp://scy@10.168.108.2:22/data/scy/anaconda3/envs/pytorch_2.4.0/bin/python3.11)" project-jdk-type="Python SDK" />
 </project>

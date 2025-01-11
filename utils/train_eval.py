@@ -95,41 +95,15 @@ def train_one_epoch(model, optimizer,metric_collection=None, data_loader=None, d
             output = model(img)
             if aux_loss:
                 loss = criterion(output, labels)+criterion_focal(output,labels,target)
-                # loss =  criterion_focal(output, labels, target)
             else:
                 loss = criterion(output, labels)
-            # if aux_loss:
-            #     loss = torch.zeros(1).to(device)
-            #     for out in output:
-            #         pred= torch.argmax(out, 1).detach().cpu()#.numpy()
-            #         loss_wights = 1-accuracy_score(target, pred)
-            #         #loss += loss_wights* (criterion(out, labels)+criterion_focal(out, labels))/2.0
-            #         loss += loss_wights * criterion(out, labels)
-            #     #loss=loss/len(output)
-            # else:
-            #     loss = criterion(output, labels)
-
         if not math.isfinite(loss): # this could trigger if using AMP
             logging.info(f'Loss is {loss}, stopping training')
             assert math.isfinite(loss)
         optimizer.zero_grad()
-        ########没有AMP#####
-        # loss.backward()
-        # optimizer.step()
-        ########END########
-        #########AMP##########
-        #
         scaler.scale(loss).backward()
-        # scaler.unscale_(optimizer)
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         scaler.step(optimizer)
         scaler.update()
-        #
-        # if epoch>ema_updata_epoch:
-        #     num_updates += 1
-        #     model_ema.update(model, step=num_updates)
-
-
         with torch.no_grad():
             total_loss = total_loss + loss.item()
             data_loader.set_description('loss:{:.6f}'.format(loss.item()))
@@ -141,7 +115,6 @@ def train_one_epoch(model, optimizer,metric_collection=None, data_loader=None, d
 @torch.no_grad()
 def evaluate(model, metric_collection=None, data_loader=None, device=0,criterion=None,
              args=None,k_fold=None):
-    # args.output_csv=None
     metric_collection.reset()
     model.eval()
     total_loss=0
@@ -208,9 +181,7 @@ def test_prob(model,metric_collection=None,num_classes=2, data_loader=None, devi
     TTA_result /= TTA_number
     TTA_result = TTA_result.softmax(1).detach().cpu()
     one_epoch_label = one_epoch_label.detach().cpu()
-                # running_pred.append(pred.softmax(1).detach().cpu())
 
-    # one_epoch_pred=torch.cat(running_pred,dim=0)
     PathDF = pd.DataFrame({'id':running_id,'B': TTA_result[:,0].numpy(),'M':TTA_result[:, 1].numpy(),'AI_label':TTA_result.argmax(1),'label':one_epoch_label})
     PathDF.to_csv("LivNet_3020_test{}.csv".format(k_flod), index=True)#4565
     TTA_result=TTA_result.argmax(1)
@@ -361,25 +332,16 @@ def visual_feature(model,metric_collection=None,data_df_len=None,num_classes=2, 
                                    ):
     model.eval()
     metric_collection.reset()
-    # nodes, _ = get_graph_node_names(model)
-    # feature_extractor = create_feature_extractor(model,return_nodes=['features.1.1','features.3.1','features.5.17','features.7.1'])
-    # out = feature_extractor(torch.zeros(1, 3, 224, 224))
     data_loader = tqdm(data_loader, desc='test', file=sys.stdout)
     running_pred = []
     running_label = []
     total_loss=0
-    # dim=[1,4,5,12,13,14,16,19,22,24,25,26,27,28,33,34,41,42,43,45,
-    #      46,47,49,51,52,55,56,57,66,68,72,74,80,83,84,90,99,107,108,110,111,112]
-    # dim =[]
     for step, (img, labels,img_path) in enumerate(data_loader):
         img=img.to(device)
         labels=labels.to(device)
         with torch.cuda.amp.autocast():
             feature_list = model(img)
-            # feature_list = feature_extractor(img)
-            # feature_list = [feature_list['features.1.1'],feature_list['features.3.1'],feature_list['features.5.17'],feature_list['features.7.1']]
         for stage,feature in enumerate(feature_list):
-            # feature=feature_list[-1]
             if len(feature.shape)==4:
                 grid_img = make_grid(feature[:,:,:,:48].permute(3, 0, 1, 2), normalize=False, scale_each=True, nrow=8)
                 plt.figure(figsize=(20, 20))  # 你可能需要调整这个大小以适应你的显示需求
@@ -391,44 +353,20 @@ def visual_feature(model,metric_collection=None,data_df_len=None,num_classes=2, 
             if len(feature.shape)==3:
                 B, N, C = feature.shape
                 H= W = int(np.sqrt(N))
-                # feature = feature.view(B, H, W, C)[:,:,:,:96].contiguous()
                 feature = feature.view(B, H, W, C).contiguous()
-                # new_feature=[]
-                # for i in range(feature.shape[-1]):
-                #     if i not in dim:
-                #         new_feature.append(feature[:,:,:,i])
-                # feature=torch.cat(new_feature).unsqueeze(-1).permute(3,1,2,0)[:,:,:,:48]
-                # feature = feature.view(B, H, W, C).contiguous()
                 grid_img = make_grid(feature[:,:,:,:48].permute(3, 0, 1, 2), normalize=False, scale_each=False, nrow=8)#.permute(3, 0, 1, 2)
                 plt.figure(figsize=(20, 20))  # 你可能需要调整这个大小以适应你的显示需求
                 plt.imshow(grid_img.detach().cpu().numpy().transpose(1, 2, 0))  # 调整通道顺序以适应 matplotlib 的要求
                 plt.axis('off')
                 plt.savefig(f'/home/uax/SCY/Decouple_liver/visual_feature/combine/conv_all_{stage}.png',bbox_inches='tight', pad_inches=0)
                 plt.show()
-                a=0
-                # feature = feature.permute(0, 3, 1, 2)
-                # for i in range(B):
-                #     image = feature[i].detach().cpu().numpy().transpose(1, 2, 0)
-                #
-                #     for j in range(image.shape[-1]):
-                #         single_channal_image = image[:,:,j]
-                #         # single_channal_image=make_grid(single_channal_image, normalize=True, scale_each=True,nrow=1)
-                #         # image = image * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]
-                #         fig = plt.figure()
-                #         # ax = fig.add_subplot(1, 1, 1)
-                #         plt.imshow(single_channal_image,cmap='gray')
-                #         # ax.imshow(image)
-                #         plt.axis('off')
-                #         plt.savefig(f'/home/uax/SCY/Decouple_liver/visual_feature/combine/{i}_{j}.png')
-                #         plt.close()
-        a=0
 
 
 
 
 
 
-def reshape_transform(tensor, height=7, width=7):
+def reshape_transform(tensor, height=20, width=20):
     # return tensor.permute(0, 3, 1, 2)
     result = tensor.reshape(tensor.size(0),
         height, width, tensor.size(2))
@@ -438,7 +376,7 @@ def reshape_transform(tensor, height=7, width=7):
     # return tensor.permute(0,3,1,2)
 def CAM_visualization(model, data_loader,device=0):
     output_path='/home/uax/SCY/Decouple_liver/visual_feature/cam/LIVER'
-    checkpoint = torch.load('/media/uax/CA4E64EFA9C3DA83/HCC/ablation/LENet-serial-sparse_token-4experts-top_1-linear-q_former_depths2_2_6_2-num_query_100-query_dim_768_val0.pth'
+    checkpoint = torch.load('/media/uax/CA4E64EFA9C3DA83/HCC/ablation/LENet-serial-sparse_token-4experts-top_2-linear-q_former_depths2_2_6_2-num_query_400-query_dim_768_val0.pth'
                             ,map_location='cpu')
     #/media/uax/CA4E64EFA9C3DA83/HCC/convnext/Convnext_val0.pth
     #/home/uax/SCY/Decouple_liver/checkpoints/SwinTransformer_S_val0.pth
