@@ -1,18 +1,2 @@
-## 项目简介
-这是一个用于HSQformer的GitHub项目，包含了相关的数据集和代码。
-
-## 数据集信息
-
-### 数据集上传
-- **上传时间**：2024年2月15日
-- **数据集描述**：[数据集的简要描述，例如数据集的来源、内容、格式等]
-
-### 伦理认证
-- **认证时间**：2024年2月15日
-- **认证机构**：[认证机构名称]
-- **认证编号**：[认证编号，如果有]
-
-### 使用限制
-- 该数据集仅限于学术研究使用，不得用于商业用途。
-- 使用该数据集时，请遵守相关的法律法规和伦理准则。
-- 引用该数据集时，请按照以下格式进行引用：
+HSQformer Project
+<p align="center"> <picture> <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Asunatan/HSQformer/main/docs/source/assets/logos/HSQformer-logo-text-dark.png"> <img alt="HSQformer" src="https://raw.githubusercontent.com/Asunatan/HSQformer/main/docs/source/assets/logos/HSQformer-logo-text-light.png" width=55%> </picture> </p><h3 align="center"> A Retrospective Systematic Study on Hierarchical Sparse Query Transformer-assisted Ultrasound Screening for Early Hepatocellular Carcinoma </h3><p align="center"> | <a href="https://docs.vllm.ai"><b>Documentation</b></a> | <a href="https://arxiv.org/abs/2502.03772"><b>Paper</b></a> | <a href="https://github.com/Asunatan/HSQformer/issues"><b>Developer Slack</b></a> | </p>
