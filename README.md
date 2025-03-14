@@ -15,6 +15,9 @@ Ethical Certification
 Certification Date: May 15, 2023
 
 Certifying Institution: The Third Affiliated Hospital of Sun Yat-sen University
+## Usage Restrictions
+This dataset is intended for academic research only and cannot be used for commercial purposes.
+When using this dataset, please abide by relevant laws, regulations, and ethical guidelines.
 
 ---
 ## Getting Started
