@@ -4,7 +4,7 @@
 
 *Latest News* 🔥
 - [2025/02/15] Dataset Upload:The data originates from the Third Affiliated Hospital of Sun Yat-sen University, corresponding to the single-center test in the paper.
-- [2025/03/15] Updated model weights, you can access [here](https://docs.google.com/presentation/d/1jzC_PZVXrVNSFVCW-V4cFXb6pn7zZ2CyP_Flwo05aqg/edit?usp=sharing).
+- [2025/03/15] Updated model weights, you can access [here](https://drive.google.com/drive/folders/1kGGmsbBI27C4R2y6AO6vdkv9bHp8McAk?usp=sharing).
 ---
 
 ## About
