@@ -19,3 +19,19 @@ Certifying Institution: The Third Affiliated Hospital of Sun Yat-sen University
 ---
 ## Getting Started
 
+Waiting for update
+
+---
+## Citation
+If you use this project in your research, please cite the following paper:
+```bibtex
+@misc{she2025retrospectivesystematicstudyhierarchical,
+      title={A Retrospective Systematic Study on Hierarchical Sparse Query Transformer-assisted Ultrasound Screening for Early Hepatocellular Carcinoma}, 
+      author={Chaoyin She and Ruifang Lu and Danni He and Jiayi Lv and Yadan Lin and Meiqing Cheng and Hui Huang and Lida Chen and Wei Wang and Qinghua Huang},
+      year={2025},
+      eprint={2502.03772},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2502.03772}, 
+}
+```
