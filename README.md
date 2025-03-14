@@ -3,8 +3,7 @@
 ---
 
 *Latest News* 🔥
-[2025/02] Dataset Upload
-Upload Date: February 15, 2024
+[2025/02] Dataset Upload: February 15, 2024
 Dataset Description: The data originates from the Third Affiliated Hospital of Sun Yat-sen University, corresponding to the single-center validation in the paper.
 
 
