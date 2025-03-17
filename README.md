@@ -11,8 +11,7 @@ The paper has not been formally published, and the code has not been organized. 
 
 ## About
 
-Ethical Certification
-Certification Date: May 15, 2023
+Ethical Certification Date: May 15, 2023
 
 Certifying Institution: The Third Affiliated Hospital of Sun Yat-sen University
 ## Usage Restrictions
