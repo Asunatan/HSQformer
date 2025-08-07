@@ -28,7 +28,7 @@ Waiting for update
 ---
 
 ## Citation
-If you use this project in your research, please cite the following paper:
+If you use this project in your research, please cite the following papers:
 ```bibtex
 @article{lu2025ai,
   title={AI enhanced diagnostic accuracy and workload reduction in hepatocellular carcinoma screening},
