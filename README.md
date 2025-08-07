@@ -24,9 +24,20 @@ When using this dataset, please abide by relevant laws, regulations, and ethical
 Waiting for update
 
 ---
+There is a companion article that focuses on clinical applications: AI-enhanced diagnostic accuracy and workload reduction in hepatocellular carcinoma screening.
 ## Citation
 If you use this project in your research, please cite the following paper:
 ```bibtex
+@article{lu2025ai,
+  title={AI enhanced diagnostic accuracy and workload reduction in hepatocellular carcinoma screening},
+  author={Lu, Rui-Fang and She, Chao-Yin and He, Dan-Ni and Cheng, Mei-Qing and Wang, Ying and Huang, Hui and Lin, Ya-Dan and Lv, Jia-Yi and Qin, Si and Liu, Ze-Zhi and others},
+  journal={npj Digital Medicine},
+  volume={8},
+  number={1},
+  pages={500},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
+}
 @misc{she2025retrospectivesystematicstudyhierarchical,
       title={A Retrospective Systematic Study on Hierarchical Sparse Query Transformer-assisted Ultrasound Screening for Early Hepatocellular Carcinoma}, 
       author={Chaoyin She and Ruifang Lu and Danni He and Jiayi Lv and Yadan Lin and Meiqing Cheng and Hui Huang and Lida Chen and Wei Wang and Qinghua Huang},
@@ -36,4 +47,5 @@ If you use this project in your research, please cite the following paper:
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/2502.03772}, 
 }
+
 ```
