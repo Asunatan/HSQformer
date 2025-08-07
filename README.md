@@ -5,7 +5,7 @@ The paper has not been formally published, and the code has not been organized. 
 ---
 
 *Latest News* 🔥
-- [2025/08/03] **Sister Paper Published!** Our sister paper, "AI enhanced diagnostic accuracy and workload reduction in hepatocellular carcinoma screening," has been published in npj Digital Medicine. You can read it here: [https://www.nature.com/articles/s41746-025-01892-9](https://www.nature.com/articles/s41746-025-01892-9)
+- [2025/08/03] **Sister Paper Published!** Our sister paper, "AI enhanced diagnostic accuracy and workload reduction in hepatocellular carcinoma screening" has been published in npj Digital Medicine. You can read it here: [https://www.nature.com/articles/s41746-025-01892-9](https://www.nature.com/articles/s41746-025-01892-9)
 - [2025/03/15] Updated model weights, we're sorry that we haven't obtained ethical approval for more data sources. However, we have been granted the right to release the model weights, which you can access [here](https://drive.google.com/drive/folders/1kGGmsbBI27C4R2y6AO6vdkv9bHp8McAk?usp=sharing).The three checkpoints will be used in future work to assist doctors in diagnosis and for prospective validation.
 - [2025/01/15] Dataset Upload:The data originates from the Third Affiliated Hospital of Sun Yat-sen University, corresponding to the single-center test in the paper.
 
