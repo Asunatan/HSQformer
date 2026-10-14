@@ -234,11 +234,10 @@ class Liver_Dataset(Dataset):
         return self.path_df.shape[0]
     def __getitem__(self, idx):
         img_path =  self.path_df.iloc[idx]['images']
-        # img_path='/home/uax/SCY/A_ADATA/classification_data/test/Benign/C31256_1_0_2_1.png'
         label = self.path_df.iloc[idx]['labels']
 
         image = self.transforms(Image.open(img_path).convert("RGB"))
-        return image, label,img_path
+        return image, label
         # img = cv2.imread(img_path)
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # if self.mode == 'train':
