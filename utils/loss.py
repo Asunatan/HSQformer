@@ -148,43 +148,238 @@ class Simple_FocalLoss(nn.Module):#fast ai库和
             loss = loss.sum()
         return loss
 
+
+
+
 class FocalLoss(nn.Module):
-    def __init__(self, gamma=2, alpha=0.25,beta=0.9999, reduction='mean'):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma  # 调节难易样本权重参数
-        self.alpha = alpha  # 调节不平衡样本权重参数
-        self.reduction = reduction  # 损失函数值合并的方式
-        self.beta = beta
+    """
+    Unified Focal Loss for binary, multi-class, and multi-label classification.
 
-    def update(self, target_int):#这里有个问题，如果全部抽到一类的怎么解决的？这个问题还大概率出现在二分类任务上
+    Supports:
+      - Hard labels
+      - Soft labels (probability distributions)
+      - Label smoothing (applied internally for hard labels)
+      - Class balancing via alpha (scalar or per-class)
 
-        samples_per_class=torch.bincount(target_int)
-        effective_num = 1.0 - torch.pow(self.beta, samples_per_class)
-        weights = (1.0 - self.beta) / effective_num
-        weights = weights / torch.sum(weights) * len(samples_per_class)
-        self.alpha = weights
-    def forward(self, input, target,target_int):
-        self.update(target_int)
-        ce_loss = F.cross_entropy(input, target,weight=self.alpha.to(0),reduction='none')  # 计算交叉熵损失
-        pt = torch.exp(-ce_loss)
-        focal_loss =  (1 - pt) ** self.gamma * ce_loss  # 计算Focal Loss
-        # self.alpha = torch.tensor(self.alpha).to(0)
-        # select_soft_labels = torch.gather(torch.softmax(input, dim=1), 1, target.argmax(1))  # 计算类别权重
-        # 计算类别置信度
-        # if self.alpha is not None:
-        #     self.alpha = torch.tensor(self.alpha).to(0)
-        #     select_soft_labels = torch.gather(torch.softmax(input, dim=1), 1, target.unsqueeze(1))  # 计算类别权重
-        #     alpha = select_soft_labels * (1 - self.alpha) + (1 - select_soft_labels) * self.alpha
-        #     focal_loss = alpha * (1 - pt) ** self.gamma * ce_loss  # 计算Focal Loss
-        # else:
-        #     focal_loss = (1 - pt) ** self.gamma * ce_loss
+    Args:
+        gamma (float): Focusing parameter.
+        alpha: Balancing factor.
+               - binary / multi-label: scalar in [0, 1] (positive-class weight)
+               - multi-class: scalar or sequence of length num_classes
+               - None: no balancing
+        reduction (str): 'none' | 'mean' | 'sum'
+        task_type (str): 'binary' | 'multi-class' | 'multi-label'
+        num_classes (int): Required for 'multi-class'.
+        label_smoothing (float): In [0, 1). Only applied when targets are hard labels.
+    """
 
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
+    def __init__(
+        self,
+        gamma=2.0,
+        alpha=None,
+        reduction="mean",
+        task_type="multi-class",
+        num_classes=None,
+        label_smoothing=0.0,
+    ):
+        super().__init__()
+        if gamma < 0:
+            raise ValueError("gamma must be non-negative")
+        if reduction not in {"none", "mean", "sum"}:
+            raise ValueError("reduction must be 'none', 'mean', or 'sum'")
+        if task_type not in {"binary", "multi-class", "multi-label"}:
+            raise ValueError(
+                "task_type must be 'binary', 'multi-class', or 'multi-label'"
+            )
+        if not 0.0 <= label_smoothing < 1.0:
+            raise ValueError("label_smoothing must be in [0, 1)")
+        if task_type == "multi-class" and num_classes is None:
+            raise ValueError("num_classes must be specified for multi-class tasks")
+
+        self.gamma = float(gamma)
+        self.reduction = reduction
+        self.task_type = task_type
+        self.num_classes = num_classes
+        self.label_smoothing = float(label_smoothing)
+
+        # Normalize alpha to a tensor (kept on CPU; moved to device in forward).
+        self.alpha = self._normalize_alpha(alpha, task_type, num_classes)
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _normalize_alpha(alpha, task_type, num_classes):
+        if alpha is None:
+            return None
+        if isinstance(alpha, (list, tuple)):
+            alpha = torch.tensor(alpha, dtype=torch.float32)
+        elif isinstance(alpha, (int, float)):
+            alpha = torch.tensor(alpha, dtype=torch.float32)
+        elif isinstance(alpha, torch.Tensor):
+            alpha = alpha.detach().clone().float()
         else:
-            return focal_loss
+            raise TypeError("alpha must be None, a number, a list/tuple, or a tensor")
+
+        if task_type == "multi-class":
+            if alpha.dim() == 0:
+                pass  # scalar
+            elif alpha.numel() == num_classes:
+                alpha = alpha.reshape(-1)
+            else:
+                raise ValueError(
+                    "multi-class alpha must be a scalar or have one weight per class"
+                )
+        else:
+            if alpha.numel() != 1:
+                raise ValueError(
+                    f"{task_type} alpha must be a scalar positive-class weight"
+                )
+            alpha = alpha.reshape(())
+        return alpha
+
+    def _reduce(self, loss):
+        if self.reduction == "mean":
+            return loss.mean()
+        if self.reduction == "sum":
+            return loss.sum()
+        return loss
+
+    # ------------------------------------------------------------------ #
+    # Entry
+    # ------------------------------------------------------------------ #
+    def forward(self, inputs, targets):
+        if self.task_type == "binary":
+            return self._binary_forward(inputs, targets)
+        if self.task_type == "multi-class":
+            return self._multi_class_forward(inputs, targets)
+        return self._multi_label_forward(inputs, targets)
+
+    # ------------------------------------------------------------------ #
+    # Binary
+    # ------------------------------------------------------------------ #
+    def _binary_forward(self, inputs, targets):
+        # Accept logits shaped [B] or [B, 1]
+        if inputs.dim() == 2 and inputs.size(1) == 1:
+            inputs = inputs.squeeze(1)
+        if inputs.dim() != 1:
+            raise ValueError("binary inputs must have shape [B] or [B, 1]")
+
+        if targets.dim() == 2 and targets.size(1) == 1:
+            targets = targets.squeeze(1)
+        if targets.dim() != 1 or targets.shape != inputs.shape:
+            raise ValueError("binary targets must have the same shape as inputs")
+
+        targets = targets.to(device=inputs.device, dtype=inputs.dtype)
+        if torch.any((targets < 0) | (targets > 1)):
+            raise ValueError("binary targets must be in [0, 1]")
+
+        # Apply label smoothing only for hard labels.
+        is_hard = bool(torch.all((targets == 0) | (targets == 1)))
+        if is_hard and self.label_smoothing > 0:
+            eps = self.label_smoothing
+            targets = targets * (1.0 - eps) + eps * 0.5
+
+        # Numerically stable per-class log-probs
+        log_p = F.logsigmoid(inputs)          # log(sigmoid(x))
+        log_1p = F.logsigmoid(-inputs)        # log(1 - sigmoid(x))
+        p = log_p.exp()
+        p1 = p.clamp(0.0, 1.0)
+
+        # Per-branch focal weights
+        loss_pos = -((1.0 - p1) ** self.gamma) * log_p   # weight for y = 1
+        loss_neg = -(p1 ** self.gamma) * log_1p          # weight for y = 0
+
+        if self.alpha is not None:
+            alpha = self.alpha.to(device=inputs.device, dtype=inputs.dtype)
+            loss = targets * alpha * loss_pos + (1.0 - targets) * (1.0 - alpha) * loss_neg
+        else:
+            loss = targets * loss_pos + (1.0 - targets) * loss_neg
+
+        return self._reduce(loss)
+
+    # ------------------------------------------------------------------ #
+    # Multi-class
+    # ------------------------------------------------------------------ #
+    def _multi_class_forward(self, inputs, targets):
+        if inputs.dim() != 2:
+            raise ValueError("multi-class inputs must have shape [B, C]")
+        B, C = inputs.shape
+        if C != self.num_classes:
+            raise ValueError(
+                f"inputs has {C} classes but num_classes={self.num_classes}"
+            )
+
+        log_probs = F.log_softmax(inputs, dim=1)     # [B, C]
+        probs = log_probs.exp()                      # [B, C]
+
+        # Build soft target distribution [B, C]
+        if targets.dim() == 1:
+            targets = targets.to(device=inputs.device, dtype=torch.long)
+            if torch.any((targets < 0) | (targets >= C)):
+                raise ValueError("target class index out of range")
+            target_probs = F.one_hot(targets, num_classes=C).to(log_probs.dtype)
+            if self.label_smoothing > 0:
+                eps = self.label_smoothing
+                target_probs = target_probs * (1.0 - eps) + eps / C
+        elif targets.dim() == 2 and targets.shape == inputs.shape:
+            target_probs = targets.to(device=inputs.device, dtype=log_probs.dtype)
+            if torch.any((target_probs < 0) | (target_probs > 1)):
+                raise ValueError("soft targets must be in [0, 1]")
+        else:
+            raise ValueError(
+                "multi-class targets must be class indices [B] or "
+                "soft labels with shape [B, C]"
+            )
+
+        # Per-class focal weighting (works for hard and soft targets).
+        focal_weight = (1.0 - probs.clamp(0.0, 1.0)) ** self.gamma
+        loss = -(target_probs * focal_weight * log_probs)   # [B, C]
+
+        if self.alpha is not None:
+            alpha = self.alpha.to(device=inputs.device, dtype=log_probs.dtype)
+            if alpha.numel() == 1:
+                loss = loss * alpha
+            else:
+                loss = loss * alpha.reshape(1, C)
+
+        loss = loss.sum(dim=1)   # [B]
+
+        return self._reduce(loss)
+
+    # ------------------------------------------------------------------ #
+    # Multi-label
+    # ------------------------------------------------------------------ #
+    def _multi_label_forward(self, inputs, targets):
+        if inputs.dim() != 2:
+            raise ValueError("multi-label inputs must have shape [B, C]")
+
+        targets = targets.to(device=inputs.device, dtype=inputs.dtype)
+        if targets.shape != inputs.shape:
+            raise ValueError("multi-label targets must have the same shape as inputs")
+        if torch.any((targets < 0) | (targets > 1)):
+            raise ValueError("multi-label targets must be in [0, 1]")
+
+        # Optional label smoothing for hard (0/1) multi-label targets
+        is_hard = bool(torch.all((targets == 0) | (targets == 1)))
+        if is_hard and self.label_smoothing > 0:
+            eps = self.label_smoothing
+            targets = targets * (1.0 - eps) + eps * 0.5
+
+        log_p = F.logsigmoid(inputs)          # log(sigmoid(x))
+        log_1p = F.logsigmoid(-inputs)        # log(1 - sigmoid(x))
+        p = log_p.exp().clamp(0.0, 1.0)
+
+        loss_pos = -((1.0 - p) ** self.gamma) * log_p
+        loss_neg = -(p ** self.gamma) * log_1p
+
+        if self.alpha is not None:
+            alpha = self.alpha.to(device=inputs.device, dtype=inputs.dtype)
+            loss = targets * alpha * loss_pos + (1.0 - targets) * (1.0 - alpha) * loss_neg
+        else:
+            loss = targets * loss_pos + (1.0 - targets) * loss_neg
+
+        return self._reduce(loss)
 
 
 class DiceLoss(nn.Module):
@@ -266,7 +461,6 @@ class offical_DiceLoss(nn.Module):
 
         loss = self.loss_weight * dice_loss(pred,one_hot_target,valid_mask=valid_mask,smooth=self.smooth,exponent=self.exponent,class_weight=class_weight,ignore_index=self.ignore_index)
         return loss.sum()
-
 
 
 

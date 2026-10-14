@@ -12,9 +12,8 @@ import torch.nn.functional as F
 from functools import partial
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.helpers import load_pretrained
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
+from timm.models import load_pretrained, register_model
+from timm.layers import DropPath, to_2tuple, trunc_normal_
 from einops.layers.torch import Rearrange
 import torch.utils.checkpoint as checkpoint
 import numpy as np
@@ -419,4 +418,3 @@ def CSWin_144_24322_large_384(pretrained=False, **kwargs):
         split_size=[1,2,12,12], num_heads=[6,12,24,24], mlp_ratio=4., **kwargs)
     model.default_cfg = default_cfgs['cswin_384']
     return model
-

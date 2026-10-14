@@ -19,8 +19,8 @@ import numpy as np
 import torch
 from einops import rearrange
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.layers import DropPath, trunc_normal_
-from timm.models.registry import register_model
+from timm.layers import DropPath, trunc_normal_
+from timm.models import register_model
 from torch import einsum, nn
 
 __all__ = [

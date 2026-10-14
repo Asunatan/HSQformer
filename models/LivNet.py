@@ -7,10 +7,9 @@ from torch import nn, einsum
 import torch.nn.functional as F
 from einops import rearrange,repeat
 from .convnext_segmentaion import ConvNeXt
-from timm.models.layers import  DropPath
-# from .swin_transformer import SwinTransformer
+from timm.layers import DropPath
 from .swin_transformer import SwinTransformer
-from .cswin_transformer_segmentation import CSWin
+
 
 
 class SwitchTransformersTop1Router(nn.Module):
@@ -652,58 +651,31 @@ class SCAttentionLayer(nn.Module):
             raise Exception("args.serial_parallel error")
 
 class SC_MoEBlock(nn.Module):
-    def __init__(self, embed_dim,seq_length=None,num_heads=8, num_experts=4, top_k=1,dropout=0.,shared=False,args=None):
+    def __init__(self, embed_dim,out_features=None,num_heads=8, num_experts=4, top_k=1,dropout=0.,shared=False,args=None):
         super().__init__()
-        # self.pos_embedding_swin = nn.Parameter(torch.empty(1, seq_length, embed_dim).normal_(std=0.02))
-        # self.pos_embedding_conv = nn.Parameter(torch.empty(1, seq_length, embed_dim).normal_(std=0.02))
-        # self.pos_embedding = nn.Parameter(torch.empty(1, seq_length, embed_dim).normal_(std=0.02))
+
         self.sclayer = SCAttentionLayer(embed_dim=embed_dim,num_heads=num_heads,serial_parallel=args.serial_parallel)
-
-
         self.moe_norm = nn.LayerNorm(embed_dim)
         if args.sparse_dense=='sparse_token':
-            self.moe = SparseMoE_token(embed_dim=embed_dim,num_experts=num_experts,
+            self.moe = SparseMoE_token(embed_dim=embed_dim,num_experts=num_experts,out_features=out_features,
                                        top_k=top_k,dropout=dropout,shared=shared)
         elif args.sparse_dense=='dense_token':
-            self.moe = SparseMoE_token(embed_dim=embed_dim,num_experts=num_experts,
+            self.moe = SparseMoE_token(embed_dim=embed_dim,num_experts=num_experts,out_features=out_features,
                                        top_k=num_experts,dropout=dropout,shared=shared)
         elif args.sparse_dense=='sparse_expert':
-            self.moe = SparseMoE_expert(embed_dim=embed_dim,num_experts=num_experts,
+            self.moe = SparseMoE_expert(embed_dim=embed_dim,num_experts=num_experts,out_features=out_features,
                                        top_k=top_k,dropout=dropout,shared=shared)
         elif args.sparse_dense=='dense_expert':
-            self.moe = SparseMoE_expert(embed_dim=embed_dim,num_experts=num_experts,
+            self.moe = SparseMoE_expert(embed_dim=embed_dim,num_experts=num_experts,out_features=out_features,
                                        top_k=num_experts,dropout=dropout,shared=shared)
         elif args.sparse_dense=='mlp':
             self.moe = MLPLayer(embed_dim,dropout=dropout)
         else:
             raise Exception("Moe mode error")
 
-        # self.token_gate = nn.Linear(num_experts*seq_length, seq_length)
-        # self.token_gate_noise = nn.Linear(num_experts*seq_length, seq_length)
-        # self.token_topk=seq_length
-
 
     def forward(self, x_swin,x_conv):
-
-        # x_swin = x_swin + self.pos_embedding
-        # x_conv = x_conv + self.pos_embedding
         x = self.sclayer(x_swin,x_conv)
-        #concat
-        # x_swin_ += x_swin
-        # x_conv2swin += x_swin
-        # x_conv_ += x_conv
-        # x_swin2conv += x_conv
-        # x= torch.cat([x_swin_,x_conv2swin,x_conv_,x_swin2conv],dim=1)
-        # x,_ = x.topk(self.token_topk, dim=1)
-        # # logits = self.token_gate(x.transpose(-1,-2))
-        # # # Noise logits
-        # # noise_logits = self.token_gate_noise(x.transpose(-1,-2))
-        # # noise = torch.randn_like(logits) * F.softplus(noise_logits)
-        # # noisy_logits = logits + noise
-
-        # top_k_logits, indices = noisy_logits.topk(self.top_k, dim=-1)
-        #add
-
         x = self.moe(self.moe_norm(x)) + x
         return x
 
@@ -777,7 +749,7 @@ class MLPLayer(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features_radio *  in_features
         self.fc1 = nn.Linear(in_features, hidden_features)
-        self.act = nn.GELU()#build_act_layer(act_layer)
+        self.act = nn.GELU()
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(dropout)
 
@@ -790,11 +762,9 @@ class MLPLayer(nn.Module):
         return x
 
 class LivNet_Baseline(nn.Module):
-    def __init__(self,num_classes=2,aux_loss=False,drop_path_rate=0.0,return_feature=False,
-                 k_fold=None,**kwargs):
+    def __init__(self,num_classes=2,drop_path_rate=0.0,return_feature=False,
+                 **kwargs):
         super().__init__()
-        self.aux_loss=aux_loss
-        self.k_fold=k_fold
         self.num_classes = num_classes
         self.return_feature = return_feature
         self.swin = SwinTransformer(embed_dim=96, depth=[2,2,18,2],drop_path_rate=drop_path_rate,
@@ -831,11 +801,9 @@ class LivNet_Baseline(nn.Module):
 
         del swin_weight,convnext_weight
 class LivNet_no_moe(nn.Module):
-    def __init__(self,num_classes=2,aux_loss=False,drop_path_rate=0.,return_feature=False,
-                 dropout=0.1,k_fold=None,**kwargs):
+    def __init__(self,num_classes=2,drop_path_rate=0.,return_feature=False,
+                 dropout=0.1,**kwargs):
         super().__init__()
-        self.aux_loss=aux_loss
-        self.k_fold=k_fold
         self.num_classes = num_classes
         self.return_feature = return_feature
         self.swintransformer = SwinTransformer(embed_dim=96, depths=[2,2,18,2],drop_path_rate=drop_path_rate,
@@ -902,126 +870,164 @@ class LivNet_no_moe(nn.Module):
 
 
 class LENet(nn.Module):
-    def __init__(self,num_classes=2,aux_loss=False,drop_path_rate=0.2,dropout=0.5,k_fold=None,
-                 image_size=224,patch_size=4,args=None,**kwargs):
+    def __init__(self, num_classes=2, drop_path_rate=0.2, dropout=0.5,
+                 image_size=224, patch_size=4, args=None, **kwargs):
         super().__init__()
-        self.cat_moe_head =args.cat_moe_head
+        if args is None:
+            raise ValueError("LENet requires model arguments")
 
-        self.aux_loss=aux_loss
-        self.k_fold=k_fold
+        self.cat_moe_head = args.cat_moe_head
         self.num_classes = num_classes
         self.return_feature = args.visual_feature
-        self.swintransformer = SwinTransformer(embed_dim=96, depths=[2,2,18,2],drop_path_rate=drop_path_rate,
-        num_heads=[3, 6, 12, 24], **kwargs)
-        self.convnext = ConvNeXt(depths=[3, 3, 27, 3], dims=[96, 192, 384, 768], drop_path_rate=drop_path_rate,
+        self.query_dim = args.query_dim
+        self.q_former_depths = list(args.q_former_depths)
+        self.num_stages = len(args.stage_dims)
+
+        self.swintransformer = SwinTransformer(
+            embed_dim=96,
+            depths=[2, 2, 6, 2],
+            drop_path_rate=0.1,
+            num_heads=[3, 6, 12, 24],
+            **kwargs,
+        )
+        self.convnext = ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=drop_path_rate,
                                  **kwargs)
-        q_former_head_num = args.q_former_head_num
-        self.q_former_depths = args.q_former_depths
-        self.q_former_len=len(self.q_former_depths)
-        dims = args.stage_dims
-        query_dim=args.query_dim
-        for _ in range(4 - len(dims)):
-            image_size //= 2
-
-        self.sc_att_mlp = nn.ModuleList()
-        self.stage_proj = nn.ModuleList()
-        self.q_cross_stage = nn.ModuleList()
-        self.pos_embedding = nn.ModuleList()
-        # stochastic depth
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(self.q_former_depths))]  # stochastic depth decay rule
-        cur = 0
-        for i in range(len(dims)):
-            seq_length = (image_size // patch_size) ** 2
-            layer = SC_MoEBlock(embed_dim=dims[i],num_experts=4,top_k=1,seq_length=seq_length,
-                                num_heads=q_former_head_num[i],dropout=dropout,shared=False,args=args)
-            self.sc_att_mlp.append(layer)
-            image_size //= 2
-            layer = nn.Linear(dims[i],query_dim)
-            self.stage_proj.append(layer)
-            layer = nn.ModuleList(Q_former(embed_dim=query_dim,num_heads=q_former_head_num[i],args=args,
-            drop_path=dpr[cur + j]) for j in range(self.q_former_depths[i]))
-            self.q_cross_stage.append(layer)
-            cur += self.q_former_depths[i]
-
-            self.pos_embedding.append(nn.Embedding(seq_length, dims[i]))
-            # layer_norm = nn.LayerNorm(dims[i])
-            # layer_name = f'norm{i}'
-            # self.add_module(layer_name, layer_norm)
-
-        self.query_tokens = nn.Parameter(torch.zeros(1, args.num_query_tokens, query_dim))
-        self.pos_embedding_query_tokens = nn.Parameter(torch.empty(1, args.num_query_tokens, query_dim).normal_(std=0.02))
-
-
-
-        self.level_embed = nn.Embedding(len(dims), query_dim)
+        #HSQformer
+        self._build_stage_modules(
+            args=args,
+            dropout=dropout,
+            drop_path_rate=drop_path_rate,
+        )
+        self.query_tokens = nn.Parameter(torch.zeros(1, args.num_query_tokens, self.query_dim))
+        self.pos_embedding_query_tokens = nn.Parameter(
+            torch.empty(1, args.num_query_tokens, self.query_dim).normal_(std=0.02)
+        )
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        if args.head_type=='moe_head':
-            self.head = SparseMoE_token(query_dim,args.num_experts,out_features=num_classes)
-        if args.head_type=='linear':
-            self.head = nn.Linear(query_dim,num_classes)
-        if args.head_type=='mlp':
-            self.head = MLPLayer(query_dim,out_features=num_classes)
-        self.head_norm = nn.LayerNorm(query_dim)
+        self.head_norm = nn.LayerNorm(self.query_dim)
+        self.head = self._build_head(args, num_classes)
 
         self.apply(self._init_weights)
         self.load_pretrained()
 
+    def _build_stage_modules(self, args, dropout, drop_path_rate):
+        dimensions = list(args.stage_dims)
+        head_counts = list(args.q_former_head_num)
+        depths = self.q_former_depths
+        if not dimensions or len(dimensions) > 4:
+            raise ValueError("stage_dims must contain between one and four stages")
+        if len(dimensions) != len(depths) or len(dimensions) != len(head_counts):
+            raise ValueError("stage_dims, q_former_depths, and q_former_head_num must have equal lengths")
+        if any(depth < 0 for depth in depths):
+            raise ValueError("q_former_depths cannot contain negative values")
+
+        self.sc_att_mlp = nn.ModuleList()
+        self.stage_proj = nn.ModuleList()
+        self.q_cross_stage = nn.ModuleList()
+        drop_path_rates = torch.linspace(0, drop_path_rate, sum(depths)).tolist()
+        drop_path_index = 0
+
+        for stage_index, dimension in enumerate(dimensions):
+            self.sc_att_mlp.append(
+                SC_MoEBlock(
+                    embed_dim=dimension,
+                    num_experts=args.num_experts,
+                    top_k=args.top_k,
+                    num_heads=head_counts[stage_index],
+                    dropout=dropout,
+                    shared=False,
+                    args=args,
+                )
+            )
+            self.stage_proj.append(nn.Linear(dimension, self.query_dim))
+            self.q_cross_stage.append(
+                nn.ModuleList(
+                    Q_former(
+                        embed_dim=self.query_dim,
+                        num_heads=head_counts[stage_index],
+                        num_experts=args.num_experts,
+                        top_k=args.top_k,
+                        dropout=dropout,
+                        args=args,
+                        drop_path=drop_path_rates[drop_path_index + depth_index],
+                    )
+                    for depth_index in range(depths[stage_index])
+                )
+            )
+            drop_path_index += depths[stage_index]
+
+    def _build_head(self, args, num_classes):
+        if args.head_type == "moe_head":
+            return SparseMoE_token(self.query_dim, args.num_experts, out_features=num_classes)
+        if args.head_type == "linear":
+            return nn.Linear(self.query_dim, num_classes)
+        if args.head_type == "mlp":
+            return MLPLayer(self.query_dim, out_features=num_classes)
+        raise ValueError(f"Unsupported head type: {args.head_type}")
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            nn.init.trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
+            nn.init.trunc_normal_(m.weight, std=0.02)
+            if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
+    def _encode_stages(self, swin_features, convnext_features):
+        stage_features = []
+        first_feature_index = 4 - self.num_stages
 
+        for stage_index, fusion_layer in enumerate(self.sc_att_mlp):
+            feature_index = first_feature_index + stage_index
+            fused = fusion_layer(
+                swin_features[feature_index],
+                convnext_features[feature_index],
+            )
+            projected = self.stage_proj[stage_index](fused)
+            stage_features.append(projected)
+
+        return stage_features
+
+    def _fuse_queries(self, stage_features):
+        queries = self.query_tokens.expand(stage_features[0].shape[0], -1, -1)
+        queries = queries + self.pos_embedding_query_tokens
+
+        attended_stages = []
+        for stage_index, layers in enumerate(self.q_cross_stage):
+            for layer in layers:
+                queries = layer(queries, stage_features[stage_index])
+            if self.cat_moe_head:
+                attended_stages.append(queries)
+
+        if self.cat_moe_head:
+            return torch.cat(attended_stages, dim=1), attended_stages
+        return queries, stage_features
 
     def forward(self, x):
         swin_feature = self.swintransformer(x)
         convnext_feature = self.convnext(x)
-        out=[]
-        for i,layer in enumerate(self.sc_att_mlp):
-            x = layer(swin_feature[4-self.q_former_len+i]+self.pos_embedding[i].weight.unsqueeze(0),
-                      convnext_feature[4-self.q_former_len+i]+self.pos_embedding[i].weight.unsqueeze(0))
-            x = self.stage_proj[i](x)
-            x = x + self.level_embed.weight[i][None, None,: ]#+self.pos_embedding_kv[i].weight.unsqueeze(0)
-            # x = self.avgpool(x.transpose(1, 2)).flatten(1)
-            out.append(x)
-            # norm_layer = getattr(self, f'norm{i}')
-            # out.append(norm_layer(x))
-        x = self.query_tokens.expand(x.shape[0], -1, -1)+self.pos_embedding_query_tokens
-
-        if self.cat_moe_head:
-            for i, layer in enumerate(self.q_cross_stage):
-                x = layer(x, out[i])
-                out[i] = x
-            x = torch.cat(out, dim=1)
-        else:
-            for i, layers in enumerate(self.q_cross_stage):
-                for j , layer in enumerate(layers):
-                    x = layer(x, out[i])
-
-
-        x = self.head(self.head_norm(x))
-        x = self.avgpool(x.transpose(1, 2)).flatten(1)
-
+        stage_features = self._encode_stages(swin_feature, convnext_feature)
+        queries, output_features = self._fuse_queries(stage_features)
+        logits = self.head_norm(queries)
+        logits = self.avgpool(logits.transpose(1, 2)).flatten(1)
+        logits = self.head(logits)
         if self.return_feature:
-            return x,out
-        return x
-
+            return logits, output_features
+        return logits
 
     def load_pretrained(self):
-        swin_weight=torch.load(r'/home/uax/SCY/LiverClassification/Weights/swin_small_patch4_window7_224_22k.pth',map_location="cpu")['model']
-        convnext_weight = torch.load(r'/home/uax/SCY/LiverClassification/Weights/convnext_small_22k_224.pth',map_location="cpu")['model']
+        swin_weight = torch.load(
+            r"/home/uax/SCY/LiverClassification/Weights/swin_tiny_patch4_window7_224_22k.pth",
+            map_location="cpu",
+        )["model"]
+        convnext_weight = torch.load(
+            r"/home/uax/SCY/LiverClassification/Weights/convnext_tiny_22k_224.pth",
+            map_location="cpu",
+        )["model"]
 
-        swin_loaded_state_dict=self.swintransformer.load_state_dict(swin_weight,strict=False)
-        convnext_loaded_state_dict=self.convnext.load_state_dict(convnext_weight,strict=False)
-        swin_missing_keys = swin_loaded_state_dict.missing_keys
-        print("未加载的权重键：", swin_missing_keys)
-        convnext_missing_keys = convnext_loaded_state_dict.missing_keys
-        print("未加载的权重键：", convnext_missing_keys)
-        self.swintransformer.head = nn.Linear(in_features=self.swintransformer.head.in_features, out_features=self.num_classes)
-        self.convnext.head = nn.Linear(in_features=self.convnext.head.in_features,out_features=self.num_classes)
-        del self.swintransformer.norm,self.swintransformer.avgpool,self.swintransformer.head
+        swin_result = self.swintransformer.load_state_dict(swin_weight, strict=False)
+        convnext_result = self.convnext.load_state_dict(convnext_weight, strict=False)
+        print("未加载的权重键：", swin_result.missing_keys)
+        print("未加载的权重键：", convnext_result.missing_keys)
+        
+        del self.swintransformer.norm, self.swintransformer.avgpool, self.swintransformer.head
         del self.convnext.norm, self.convnext.head
-        del swin_weight,convnext_weight

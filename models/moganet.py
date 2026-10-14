@@ -19,8 +19,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.layers import trunc_normal_, DropPath
-from timm.models.registry import register_model
+from timm.layers import trunc_normal_, DropPath
+from timm.models import register_model
 
 # try:
 #     from mmcv.runner import _load_checkpoint

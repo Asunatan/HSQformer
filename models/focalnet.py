@@ -9,12 +9,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
+from timm.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models import is_model, register_model
 
 from torchvision import transforms
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.data import create_transform
+
+
+def _register_model_if_available(model_fn):
+    if is_model(model_fn.__name__):
+        return model_fn
+    return register_model(model_fn)
+
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -572,7 +579,7 @@ model_urls = {
     "focalnet_huge_fl4": "https://projects4jw.blob.core.windows.net/focalnet/release/classification/focalnet_huge_lrf_224_fl4.pth", 
 }
 
-@register_model
+@_register_model_if_available
 def focalnet_tiny_srf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 6, 2], embed_dim=96, **kwargs)
     if pretrained:
@@ -581,7 +588,7 @@ def focalnet_tiny_srf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_small_srf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=96, **kwargs)
     if pretrained:
@@ -590,7 +597,7 @@ def focalnet_small_srf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_base_srf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=128, **kwargs)
     if pretrained:
@@ -599,7 +606,7 @@ def focalnet_base_srf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_tiny_lrf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 6, 2], embed_dim=96, **kwargs)
     if pretrained:
@@ -608,7 +615,7 @@ def focalnet_tiny_lrf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_small_lrf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=96, **kwargs)
     if pretrained:
@@ -617,7 +624,7 @@ def focalnet_small_lrf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_base_lrf(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=128, **kwargs)
     if pretrained:
@@ -626,7 +633,7 @@ def focalnet_base_lrf(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_tiny_iso(pretrained=False, **kwargs):
     model = FocalNet(depths=[12], patch_size=16, embed_dim=192, **kwargs)
     if pretrained:
@@ -635,7 +642,7 @@ def focalnet_tiny_iso(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_small_iso(pretrained=False, **kwargs):
     model = FocalNet(depths=[12], patch_size=16, embed_dim=384, **kwargs)
     if pretrained:
@@ -644,7 +651,7 @@ def focalnet_small_iso(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_base_iso(pretrained=False, **kwargs):
     model = FocalNet(depths=[12], patch_size=16, embed_dim=768, focal_levels=[3], focal_windows=[3], use_layerscale=True, use_postln=True, **kwargs)
     if pretrained:
@@ -654,7 +661,7 @@ def focalnet_base_iso(pretrained=False, **kwargs):
     return model
 
 # FocalNet large+ models 
-@register_model
+@_register_model_if_available
 def focalnet_large_fl3(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=192, **kwargs)
     if pretrained:
@@ -663,7 +670,7 @@ def focalnet_large_fl3(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_large_fl4(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=192, **kwargs)
     if pretrained:
@@ -672,7 +679,7 @@ def focalnet_large_fl4(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_xlarge_fl3(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=256, **kwargs)
     if pretrained:
@@ -682,7 +689,7 @@ def focalnet_xlarge_fl3(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+@_register_model_if_available
 def focalnet_xlarge_fl4(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=256, **kwargs)
     if pretrained:
@@ -691,7 +698,7 @@ def focalnet_xlarge_fl4(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_huge_fl3(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=352, **kwargs)
     if pretrained:
@@ -700,7 +707,7 @@ def focalnet_huge_fl3(pretrained=False, **kwargs):
         model.load_state_dict(checkpoint["model"])
     return model
 
-@register_model
+@_register_model_if_available
 def focalnet_huge_fl4(pretrained=False, **kwargs):
     model = FocalNet(depths=[2, 2, 18, 2], embed_dim=352, **kwargs)
     if pretrained:

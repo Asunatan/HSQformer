@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from functools import partial
 
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
+from timm.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models import register_model
 from timm.models.vision_transformer import _cfg
 import math
 
@@ -326,7 +326,7 @@ def _conv_filter(state_dict, patch_size=16):
     return out_dict
 
 
-@register_model
+
 def pvt_v2_b0(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[32, 64, 160, 256], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -337,7 +337,7 @@ def pvt_v2_b0(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b1(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -348,7 +348,7 @@ def pvt_v2_b1(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b2(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -358,7 +358,7 @@ def pvt_v2_b2(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b3(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -369,7 +369,7 @@ def pvt_v2_b3(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b4(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -380,7 +380,7 @@ def pvt_v2_b4(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b5(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=True,
@@ -391,7 +391,7 @@ def pvt_v2_b5(pretrained=False, **kwargs):
     return model
 
 
-@register_model
+
 def pvt_v2_b2_li(pretrained=False, **kwargs):
     model = PyramidVisionTransformerV2(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,

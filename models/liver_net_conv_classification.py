@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from einops import rearrange,repeat
 from .convnextv2_segmentaion import ConvNeXtV2
 from .convnext_segmentaion import ConvNeXt
-from timm.models.layers import  DropPath
+from timm.layers import DropPath
 from .swin_transformer_segmentation import SwinTransformer
 from .cswin_transformer_segmentation import CSWin
 from .hiera_segmentation import Hiera
