@@ -298,8 +298,6 @@ def build_data_loaders(args, k_fold: int):
     train7_df = pd.read_csv(os.path.join(data_dir, "train_7.csv"))
     train_df = pd.concat([train_df,train7_df], axis=0)
 
-    multi_center_df = pd.concat([multi_center_df, valid_df], axis=0)
-
     train_dataset = Liver_Dataset(train_df, "train")
     val_dataset = Liver_Dataset(valid_df, "val")
     single_center_test_dataset = Liver_Dataset(single_center_test_df, "val")
